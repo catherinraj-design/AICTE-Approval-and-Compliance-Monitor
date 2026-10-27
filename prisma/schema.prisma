@@ -1,0 +1,193 @@
+// Prisma schema for AICTE Approval & Compliance Monitor Prototype
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id            String   @id
+  name          String
+  email         String
+  role          String   // INSTITUTION, REGIONAL_OFFICER, BUREAU_OFFICER, COMMITTEE_MEMBER, ADMIN
+  region        String?  // North, South, West, East, Central, or ALL
+  institutionId String?
+  designation   String?
+  createdAt     DateTime @default(now())
+}
+
+model Institution {
+  id               String   @id
+  pid              String   @unique // AICTE Permanent ID (e.g. 1-382910)
+  name             String
+  region           String   // North, South, West, East, Central
+  state            String
+  district         String
+  address          String
+  type             String   // Government, Private-Self Financing, Govt Aided, Deemed University
+  contactEmail     String
+  contactPhone     String
+  isNewInstitution Boolean  @default(false)
+  createdAt        DateTime @default(now())
+}
+
+model StagePathConfig {
+  id          String   @id
+  name        String
+  description String
+  stages      String   // JSON string of stage names: ["Scrutiny", "EVC", "SAC_SHC"]
+  isActive    Boolean  @default(true)
+  updatedAt   DateTime @default(now())
+}
+
+model Application {
+  id                   String    @id
+  applicationNumber    String    @unique
+  institutionId        String
+  institutionName      String
+  region               String
+  academicYear         String    @default("2026-27")
+  applicationType      String    // New Institution, Extension of Approval (EoA), Increase in Intake, Introduction of New Course, Change of Site
+  stagePathId          String
+  currentStage         String    // Submitted, Scrutiny, EVC, SAC_SHC, Ready for Decision, Approved, Rejected, Conditional Approval
+  currentStageIndex    Int       @default(0)
+  status               String    // PENDING, IN_REVIEW, DEFICIENCY_REVERTED, READY_FOR_DECISION, APPROVED, REJECTED, CONDITIONAL_APPROVAL
+  assignedOfficerId    String?
+  assignedOfficerName  String?
+  submittedAt          DateTime  @default(now())
+  stageStartedAt       DateTime  @default(now())
+  lastActionDate       DateTime  @default(now())
+  deficiencyReason     String?
+  finalDecisionRemarks String?
+  finalDecisionBy      String?
+  finalDecisionDate    DateTime?
+  caseSummary          String?
+  communicationDraft   String?
+  isNewInstitution     Boolean   @default(false)
+  proposedIntake       Int?
+  courseLevel          String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+}
+
+model EVCRecord {
+  id                String    @id
+  applicationId     String    @unique
+  applicationNumber String
+  institutionName   String
+  region            String
+  isNewInstitution  Boolean   @default(false)
+  visitType         String    @default("Physical") // Physical, Hybrid
+  scheduledDate     DateTime
+  committeeChairman String
+  committeeMember2  String
+  committeeMember3  String
+  status            String    // UPCOMING, DUE, COMPLETED, DELAYED
+  reportSummary     String?
+  deficienciesNoted String?
+  recommendation    String?   // Recommended, Not Recommended, Recommended with Conditions
+  conductedAt       DateTime?
+  scheduledBy       String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+model Undertaking {
+  id                 String    @id
+  applicationId      String
+  institutionId      String
+  institutionName    String
+  conditionText      String
+  approvalRef        String
+  grantedDate        DateTime
+  dueDate            DateTime
+  status             String    // PENDING, SUBMITTED, VERIFIED, REJECTED, OVERDUE, ESCALATED
+  escalationLevel    String    @default("NONE") // NONE, RO_ALERT, BO_ALERT, SENIOR_ALERT
+  evidenceFileName   String?
+  evidenceUploadedAt DateTime?
+  evidenceRemarks    String?
+  verifiedBy         String?
+  verifiedAt         DateTime?
+  officerRemarks     String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+}
+
+model DocumentValidity {
+  id                  String    @id
+  institutionId       String
+  institutionName     String
+  region              String
+  documentType        String    // Registered Land Lease Deed, Fire Safety NOC, Building Safety Certificate, AICTE Mandatory Disclosure, Environmental Clearance
+  documentNumber      String
+  validFrom           DateTime
+  validTo             DateTime
+  status              String    // VALID, EXPIRING_SOON, EXPIRED, RENEWAL_SUBMITTED, VERIFIED
+  renewalFileName     String?
+  renewalSubmittedAt  DateTime?
+  renewalRemarks      String?
+  verifiedBy          String?
+  verifiedAt          DateTime?
+  verificationRemarks String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+}
+
+model RuleConfig {
+  id               String   @id
+  name             String
+  module           String   // APPLICATION_PENDENCY, EVC_SCHEDULE, UNDERTAKING, DOCUMENT_EXPIRY
+  triggerCondition String   // BEFORE_DEADLINE, AFTER_DEADLINE_OVERDUE, STAGE_INACTIVITY
+  thresholdDays    Int
+  recipientRole    String   // REGIONAL_OFFICER, BUREAU_OFFICER, ADMIN, INSTITUTION, ALL
+  escalationLevel  String   // INFO, WARNING, ESCALATION_L1, ESCALATION_L2
+  actionMessage    String
+  isActive         Boolean  @default(true)
+  isOfficialNotice String   @default("Configurable prototype rule - not official AICTE guidelines")
+  updatedAt        DateTime @default(now())
+}
+
+model Notification {
+  id           String   @id
+  title        String
+  message      String
+  type         String   // INFO, WARNING, ESCALATION, SUCCESS
+  targetRole   String   // ALL, INSTITUTION, REGIONAL_OFFICER, BUREAU_OFFICER, ADMIN, COMMITTEE_MEMBER
+  targetRegion String?  // Optional region restriction
+  link         String?
+  isRead       Boolean  @default(false)
+  createdAt    DateTime @default(now())
+}
+
+model EmailLog {
+  id             String   @id
+  recipientEmail String
+  recipientRole  String
+  subject        String
+  contentHtml    String
+  sentAt         DateTime @default(now())
+  status         String   @default("DISPATCHED_SIMULATED")
+}
+
+model AuditLog {
+  id          String   @id
+  timestamp   DateTime @default(now())
+  performedBy String
+  userRole    String
+  action      String   // SUBMITTED, STAGE_ADVANCED, REVERTED, EVC_SCHEDULED, UNDERTAKING_UPLOAD, UNDERTAKING_VERIFIED, LEASE_RENEWAL, RULE_ESCALATION, FINAL_DECISION
+  entityType  String   // Application, EVC, Undertaking, Document, Rule
+  entityId    String
+  beforeState String?
+  afterState  String?
+  reason      String
+}
+
+model SystemSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @default(now())
+}
