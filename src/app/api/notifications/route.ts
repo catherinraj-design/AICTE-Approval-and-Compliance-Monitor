@@ -3,19 +3,43 @@ import prisma from "@/lib/prisma";
 
 export async function GET(req: NextRequest) {
   try {
-    const role = req.cookies.get("aicte_role")?.value;
+    const role = req.cookies.get("aicte_role")?.value || "ADMIN";
     const region = req.cookies.get("aicte_region")?.value;
 
-    const notifications = await prisma.notification.findMany({
-      where: {
+    let whereClause: Record<string, unknown> = {};
+
+    if (role === "ADMIN" || role === "BUREAU_OFFICER") {
+      // Senior authorities see all notifications and escalations across the council
+      whereClause = {};
+    } else if (role === "REGIONAL_OFFICER") {
+      whereClause = {
         OR: [
           { targetRole: "ALL" },
-          { targetRole: role || "ADMIN" },
+          { targetRole: "REGIONAL_OFFICER" },
           ...(region ? [{ targetRegion: region }] : []),
         ],
-      },
+      };
+    } else if (role === "INSTITUTION") {
+      whereClause = {
+        OR: [
+          { targetRole: "ALL" },
+          { targetRole: "INSTITUTION" },
+          ...(region ? [{ targetRegion: region }] : []),
+        ],
+      };
+    } else if (role === "COMMITTEE_MEMBER") {
+      whereClause = {
+        OR: [
+          { targetRole: "ALL" },
+          { targetRole: "COMMITTEE_MEMBER" },
+        ],
+      };
+    }
+
+    const notifications = await prisma.notification.findMany({
+      where: whereClause,
       orderBy: { createdAt: "desc" },
-      take: 50,
+      take: 60,
     });
 
     const unreadCount = notifications.filter((n) => !n.isRead).length;
